@@ -1,0 +1,164 @@
+---
+title: "Random Effects Part 2"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(faraway)
+data(broccoli, package='faraway')
+help(broccoli)
+```
+
+```{r}
+#Plotting the data
+library(ggplot2)
+ggplot(broccoli, aes(y=wt, x=grower, shape=box, color= cluster)) + geom_point()
+ggplot(broccoli, aes(y=wt, x=cluster, shape=grower, color= box)) + geom_point()
+ggplot(broccoli, aes(y=wt, x=box, shape=cluster, color= grower)) + geom_point()
+```
+
+A) The variation shown in grower and box are much larger than the variation of cluster. The second graph shows that the clusters are much tighter (smaller variation) between each group. Graphs 1 and 3 show large variations and no real distinction between each grower/box.  
+
+
+```{r}
+#Computing mean weights within growers
+grower_one = subset(broccoli, grower==1)
+grower_two = subset(broccoli, grower==2)
+grower_three = subset(broccoli, grower==3)
+
+mean(grower_one$wt)
+mean(grower_two$wt)
+mean(grower_three$wt)
+```
+
+```{r}
+#Computing mean weights within boxes
+box_one = subset(broccoli, box==1)
+box_two = subset(broccoli, box==2)
+box_three = subset(broccoli, box==3)
+box_four = subset(broccoli, box==4)
+
+mean(box_one$wt)
+mean(box_two$wt)
+mean(box_three$wt)
+mean(box_four$wt)
+
+```
+
+B) The mean weights within growers are calculated above as:
+  Grower 1: 358.42
+  Grower 2: 356.42
+  Grower 3: 359.67
+   The mean weights within boxes are calculated above as:
+  Box 1: 362.33
+  Box 2: 355.78
+  Box 3: 357.11
+  Box 4: 357.44
+  
+  
+```{r}
+#Fitting a mixed effects model
+
+library(lme4)
+mod1 = lmer(wt ~ grower + box + (1|cluster), broccoli)
+summary(mod1)
+```
+
+C) Variation is assigned to the fixed effects, grower and box, in a systematic and constant manner. Variation is assigned to cluster, the random effect, in a random way that varies across different clusters. Total variability is the sum of the variability explained by the fixed effects, grower and box, along with the random effect, cluster, plus any residual variability that is unexplained by the model. 
+
+```{r}
+#Testing fixed effect grower
+library(pbkrtest)
+m2 = lmer(wt ~ box + (1|cluster), broccoli)
+KRmodcomp(mod1, m2)
+
+```
+
+D) Dropping grower from the model seems reasonable since the p-value is very large (0.9019). We can reject the null that there is variation attributed to grower.
+
+```{r}
+#Testing random effect boxes
+m3 = lmer(wt ~ grower + (1|cluster), broccoli)
+KRmodcomp(mod1, m3)
+```
+
+E) Dropping box from the model seems reasonable since the p-value is very large (0.8691). We can reject the null that there is variation attributed to box.
+
+```{r}
+#Computing confidence intervals for the SD components in my full model
+
+confint(mod1, method="boot")
+```
+
+F) Confidence intervals for standard deviations are calculated above to be:
+  Grower2 = [-15.00953, 12.42665]
+  Grower3 = [-12.33420, 16.44774]
+  Box2 = [-23.05516, 9.47950]
+  Box3 = [-21.44861, 11.61912]
+  Box4 = [-21.56213, 10.70949]
+  Cluster = [0, 10.26422]
+
+
+Question 7 Page 235
+
+```{r}
+data(semicond)
+help(semicond)
+```
+
+
+```{r}
+#Plotting data
+ggplot(semicond, aes(y=resistance, x=ET, shape=Wafer, color=position)) + geom_point()
+ggplot(semicond, aes(y=resistance, x=Wafer, shape=position, color= ET)) + geom_point()
+ggplot(semicond, aes(y=resistance, x=position, shape=ET, color= Wafer)) + geom_point()
+```
+
+A) The first plot shows that resistance may increase as ET increases, however, the variance seems to be quite large within ET groups so it is hard to say with just a look on the graph. The second graph shows much closer groupings between wafers (smaller variance), but it is still hard to tell whether there is a real difference in resistance between these groups. They seem to be fairly similar. Position seems to have the most obvious pattern with a sideways S moving from groups 1 to 4. The variance is also quite small, signifying the possibility of significance for this predictor.
+
+```{r}
+#Fitting a fixed effects model
+femod = lm(resistance~ET*position, data=semicond)
+summary(femod)
+```
+
+B) There are no significant terms. This plot is not a good use to make inferences because they are missing possible predictors in the model, such as wafer and grp. Accounting for the randomness of the set up is missing as well. 
+
+```{r}
+#Fitting a mixed effects model
+memod = lmer(resistance~ ET + position + (1|Wafer) + (1|Grp), data=semicond)
+summary(memod)
+```
+
+C) The Grp model standard deviation shows as 0.32684, which is slightly larger than the residual SD. This could possibly signify that the Grp variable is not significant in the model.
+
+```{r}
+#Testing for the effect of position
+m2 = lmer(resistance~ ET + (1|Wafer) + (1|Grp), data=semicond)
+KRmodcomp(memod, m2)
+```
+
+D) With a p-value of 0.02427, we can conclude that the variable "position" is significant and should be included in the model.
+
+```{r}
+#Testing if ET is significant in the model 
+memod
+
+m3 = lmer(resistance~ position + (1|Wafer) + (1|Grp), data=semicond)
+KRmodcomp(memod, m3)
+```
+
+E) From the output of the mixed model, we can see that ET level four results in the highest resistance, since it has the largest coefficient. However, calculated above, we can see that testing the fixed effect ET shows that the variable is not significant. There is not enough evidence that ET should be included in the model. This also means that the coefficients for ET cannot be considered statistically different from 0. This means that we cannot be sure that any of these time periods are more/less resistant than another, including between ET4 and ET2. 
+
+```{r}
+plot(fitted(memod),residuals(memod),xlab="Fitted",ylab="Residuals")
+qqnorm(residuals(memod),main="")
+```
+
+F) We can see in the residual vs. fitted plot that there is no obvious pattern and so there is not a problem with the constant variance assumption. The QQnorm plot shows good results as well as there are no extreme deviations in the normal line. The ends don't seem to be perfect, but there are no obvious patterns again in this plot. 
