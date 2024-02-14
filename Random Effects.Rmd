@@ -1,0 +1,182 @@
+---
+title: "Random Effects"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Question 2 Page 233
+
+```{r}
+library(faraway)
+data(coagulation)
+help("coagulation")
+```
+
+```{r}
+#Plotting coagulation data
+library(ggplot2)
+ggplot(data = coagulation, aes(x = diet, y = coag)) +
+  geom_point(color = "blue")
+```
+
+A) It seems as though diets A and D show similar coagulation times, centered around 62, while B and D show longer times of coagulation, around 67 or 68. The variation for each diet is quite small and most points seem to be fairly close to each other in each given diet category. 
+
+
+```{r}
+#Constructing fixed effects model
+
+femod = lm(coag~diet, coagulation)
+
+#Constructing prediction for a new animal assigned to diet D
+predict(femod, newdata = data.frame(diet='D'))
+
+#Constructing a 95% prediction interval for a new animal assigned to diet D
+predictions <- predict(femod, newdata = data.frame(diet='D'), interval = "prediction", level = 0.95)
+predictions
+
+```
+
+B) The prediction for coagulation time of a new animal assigned to diet D is 61. The 95% prediction interval for the fixed effects model is (55.764, 66.236) as calculated above.
+
+
+```{r}
+#Fitting a REML random effects model
+library(lme4)
+remod <-lmer(coag ~ 1 + (1|diet), coagulation)
+summary(remod)
+```
+
+
+
+```{r}
+#Predicting the blood coagulation time (using the random effects model) for a new animal assigned diet 'D'
+set.seed(123)
+predict(remod, newdata=data.frame(diet = 'D'))
+
+#Constructing 95% prediction interval for the blood coagulation time (using the random effects model) for a new animal assigned diet 'D'
+group.sd <-as.data.frame(VarCorr(remod))$sdcor[1]
+resid.sd <-as.data.frame(VarCorr(remod))$sdcor[2]
+pv <-numeric(1000)
+for(i in 1:1000){
+  y <-unlist(simulate(remod)) 
+  bmod=suppressMessages(refit(remod,y))
+  pv[i] <-predict(bmod, newdata =data.frame(diet='D')) + rnorm(n=1,sd=group.sd) + rnorm(n=1,sd=resid.sd)
+  }
+quantile(pv, c(0.025, 0.975))
+
+```
+
+C) We have predicted the blood coagulation time for a new animal assigned diet 'D' will be 61.170. Using a parametric bootstrap method, we can generate a prediction interval for the random effects model, specifically for diet D. I have set the seed so that we get the same prediction interval each time, but this is random and can slightly vary each time it is tested. The one received from seed 123 is (53.806, 73.722).
+
+
+```{r}
+set.seed(123)
+#Predicting blood coagulation time (using random effects model) for a new animal assigned a new diet
+predict(remod, re.form=~0)[1] 
+
+#Constructing a 95% prediction interval for the blood coagulation time (using the random effects model) for a new animal assigned a new diet
+set.seed(123)
+group.sd <-as.data.frame(VarCorr(remod))$sdcor[1]
+resid.sd <-as.data.frame(VarCorr(remod))$sdcor[2]
+pv <-numeric(1000)
+for(i in 1:1000){
+  y <-unlist(simulate(remod)) 
+  bmod=suppressMessages(refit(remod,y))
+  pv[i] <-predict(bmod, re.form=~0)[1] + rnorm(n=1,sd=group.sd) + rnorm(n=1,sd=resid.sd)
+  }
+quantile(pv, c(0.025, 0.975))
+```
+
+D) We have set the seed to 123 and predicted that blood coagulation time will be 64.013 for a new animal assigned a new diet. Using a parametric bootstrap method, we can generate a prediction interval for the random effects model. The one received from seed 123 is (54.786, 72.622).
+
+
+```{r}
+#Prediction and 95% Prediction interval for the first animal with a new diet
+
+set.seed(123)
+predict(remod, re.form=~0)[1] 
+
+group.sd <-as.data.frame(VarCorr(remod))$sdcor[1]
+resid.sd <-as.data.frame(VarCorr(remod))$sdcor[2]
+pv <-numeric(1000)
+for(i in 1:1000){
+  y <-unlist(simulate(remod)) 
+  bmod=suppressMessages(refit(remod,y))
+  pv[i] <-predict(bmod, re.form=~0)[1] + rnorm(n=1,sd=group.sd) + rnorm(n=1,sd=resid.sd)
+  }
+quantile(pv, c(0.025, 0.975))
+```
+
+E) This would be identical to part E as each animal will have the same estimation with a new diet. This means the prediction will be 64.013 and the prediction interval will be (54.786, 72.622). 
+
+
+Question 3 Page 233
+
+```{r}
+data(eggprod)
+help(eggprod)
+```
+
+```{r}
+#Plotting data
+
+ggplot(eggprod, aes(y=eggs, x=treat, shape=block)) + geom_point() + xlab("Treatment")
+ggplot(eggprod, aes(y=eggs, x=block, shape=treat)) + geom_point() 
+```
+
+A) The blocks seem to have a high level of variation, while treatments the treatments, excluding F, seem to have a lower, more condensed, variation. There seems to be a somewhat negative linear pattern shown in the first graph moving from treatment E to O. The blocks are harder to examine with the high variation, but seem to show block 1 has the highest amount of eggs and block 2 and 4 have the lowest.  
+
+```{r}
+#Fitting a fixed effects model
+
+femodegg = lm(eggs~treat+block, data=eggprod)
+summary(femodegg)
+```
+
+B) We can see that only treatment O seems to be a significant predictor. All other predictors show no significant. 
+
+```{r}
+plot(femodegg)
+```
+
+B) Performing a basic diagnostic test, we can see that there is no obvious pattern in the residual vs. fitted plot. This is good. The normal QQ plot also shows a fairly normal pattern, close to the line, which is also a good sign.
+
+```{r}
+#Fitting a mixed effects model
+
+remodegg <-lmer(eggs ~ treat + (1|block), eggprod)
+summary(remodegg)
+```
+
+C) According to the model, treatment E seems to be the best in terms of maximizing egg production. I'm not sure this is the standard deviation for the block random effects is 11.4, while the residual is 19.67. This shows that the model may not be a great fit or description. We can also see the t value for treatment F is quite low, showing possibility that it is not significantly different than treatment E. 
+
+```{r}
+library(pbkrtest)
+amod <-lmer(eggs ~ treat + (1|block), eggprod, REML=FALSE)
+nmod <-lmer(eggs ~ 1 + (1|block), eggprod, REML=FALSE)
+KRmodcomp(amod, nmod) 
+```
+
+D) Using the Kenward-Roger approximation for an F-test, we can see that the p-value is slightly below 0.05. This means that the null of excluding treatment as a predictor is rejected, proving that there are differences between treatments. The fixed effect result did not show that as well, with only one of the treatments showing significance in the fixed effect model. 
+
+
+```{r}
+set.seed(123)
+pmod <-PBmodcomp(amod, nmod)
+summary(pmod)
+```
+
+
+E) In the bootstrap method we can see that the p-value set at seed 123 is 0.06394. I have repeated the test many times without a seed set and it seemed to hover around 0.06/0.07, with some p-values being significant and others not. I would err on the side of insignificance as the p-values definitely were more commonly above 0.05. This means that the bootstrap method would contradict the KR approximation of an F-test.
+
+```{r}
+library(RLRsim) 
+exactRLRT(remodegg) 
+```
+
+F) Using RLRsim to test the significance of the random effect blocks, we can see that it is not significant. We do not have enough evidence to reject the null. This does aline with the fixed effects model as the fixed effects model showed the blocks to not be significant predictors as well.
